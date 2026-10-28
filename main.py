@@ -21,9 +21,15 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
-if not SECRET_KEY or not ADMIN_USERNAME or not ADMIN_PASSWORD:
+MANAGER_USERNAME = os.getenv("MANAGER_USERNAME")
+MANAGER_PASSWORD = os.getenv("MANAGER_PASSWORD")
+
+# Проверяем, что заданы ВСЕ переменные
+if not all(
+    [SECRET_KEY, ADMIN_USERNAME, ADMIN_PASSWORD, MANAGER_USERNAME, MANAGER_PASSWORD]
+):
     logger.critical(
-        "КРИТИЧЕСКАЯ ОШИБКА: Не заданы переменные окружения SECRET_KEY, ADMIN_USERNAME или ADMIN_PASSWORD!"
+        "КРИТИЧЕСКАЯ ОШИБКА: Не заданы переменные окружения SECRET_KEY, ADMIN_USERNAME, ADMIN_PASSWORD, MANAGER_USERNAME или MANAGER_PASSWORD!"
     )
     logger.critical(
         "Создайте файл .env (или добавьте переменные на сервере Render) и перезапустите."
@@ -46,14 +52,15 @@ def create_access_token(username: str):
 
 def verify_admin_token(access_token: str | None = Cookie(default=None)):
     """
-    Проверка JWT-токена из Cookie
+    Проверка JWT-токена (пускает и админа, и менеджера)
     """
     if not access_token:
         raise HTTPException(status_code=401, detail="Вы не авторизованы")
     try:
         payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        if username != ADMIN_USERNAME:
+
+        if username not in [ADMIN_USERNAME, MANAGER_USERNAME]:
             raise HTTPException(status_code=401, detail="Неверный пользователь")
         return username
     except jwt.ExpiredSignatureError:
@@ -74,7 +81,7 @@ async def lifespan(app: FastAPI):
     await database.shutdown()
 
 
-# 2. Передаем lifespan в FastAPI
+# 2. Передача lifespan в FastAPI
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None)
 
 
@@ -91,7 +98,6 @@ async def custom_http_exception_handler(request: Request, exc: FastAPIHTTPExcept
     )
 
 
-# только админ
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html(admin: str = Depends(verify_admin_token)):
     return get_swagger_ui_html(openapi_url="/openapi.json", title="API Docs")
@@ -174,9 +180,13 @@ async def login_page(request: Request):
 @app.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
     """
-    Обработка формы входа и выдача токена
+    Обработка формы входа и выдача токена (для админа и менеджера)
     """
-    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+    # Проверка прав
+    is_admin = username == ADMIN_USERNAME and password == ADMIN_PASSWORD
+    is_manager = username == MANAGER_USERNAME and password == MANAGER_PASSWORD
+
+    if is_admin or is_manager:
         token = create_access_token(username)
         response = RedirectResponse(url="/admin", status_code=303)
         response.set_cookie(key="access_token", value=token, httponly=True)
