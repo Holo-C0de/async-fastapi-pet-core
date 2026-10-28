@@ -16,7 +16,8 @@ async def startup():
     Открытие пулла -> подготовка к работе с базой
     """
     global pool
-    pool = await asyncpg.create_pool(DATABASE_URL)
+
+    pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5)
     async with pool.acquire() as conn:
         await conn.execute("""
     CREATE TABLE IF NOT EXISTS lost_pets (
