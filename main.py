@@ -1,18 +1,18 @@
-from contextlib import asynccontextmanager
+import logging
 import os
-import jwt
-from datetime import datetime, timedelta
-from fastapi import Form, Cookie, Depends
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
+import jwt
+from fastapi import Cookie, Depends, FastAPI, Form, HTTPException, Request, status
+from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+
 import database
 from database import FurCreate
-import logging
-from fastapi.openapi.docs import get_swagger_ui_html
-from fastapi import Depends
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ def create_access_token(username: str):
     """
     Создание JWT-токена
     """
-    expire = datetime.utcnow() + timedelta(hours=2)
+    expire = datetime.now(timezone.utc) + timedelta(hours=2)
     to_encode = {"sub": username, "exp": expire}
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -76,6 +76,19 @@ async def lifespan(app: FastAPI):
 
 # 2. Передаем lifespan в FastAPI
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None)
+
+
+@app.exception_handler(FastAPIHTTPException)
+async def custom_http_exception_handler(request: Request, exc: FastAPIHTTPException):
+    # Если ошибка 401 (нет доступа) И это запрос от браузера (ожидает HTML)
+    if exc.status_code == 401 and "text/html" in request.headers.get("accept", ""):
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    # Для всех остальных случаев (ошибки API, 404 и т.д.) возвращаем стандартный JSON
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
 
 
 # только админ
