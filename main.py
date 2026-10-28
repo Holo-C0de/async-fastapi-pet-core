@@ -11,6 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import database
 from database import FurCreate
 import logging
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi import Depends
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +75,13 @@ async def lifespan(app: FastAPI):
 
 
 # 2. Передаем lifespan в FastAPI
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None)
+
+
+# только админ
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui_html(admin: str = Depends(verify_admin_token)):
+    return get_swagger_ui_html(openapi_url="/openapi.json", title="API Docs")
 
 
 app.add_middleware(
@@ -106,7 +114,7 @@ async def create_fur(fur: FurCreate):
 
 
 @app.delete("/api/pets/{fur_id}")
-async def dell_fur(fur_id: int):
+async def dell_fur(fur_id: int, admin: str = Depends(verify_admin_token)):
     """
     Удаление блока с информации о выбранном питомце
     """
@@ -120,7 +128,7 @@ async def dell_fur(fur_id: int):
 
 
 @app.patch("/api/pets/{fur_id}/found")
-async def mark_as_found(fur_id: int):
+async def mark_as_found(fur_id: int, admin: str = Depends(verify_admin_token)):
     """
     обновление статуса питомца
     """
@@ -178,7 +186,6 @@ async def logout():
     return response
 
 
-# --- АДМИНКА (ЗАЩИЩЕНА) ---
 @app.get("/admin")
 async def admin_panel(request: Request, admin: str = Depends(verify_admin_token)):
     async with database.pool.acquire() as conn:
