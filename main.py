@@ -110,15 +110,11 @@ async def custom_http_exception_handler(request: Request, exc: FastAPIHTTPExcept
 # --- ЗАЩИТА ДОКУМЕНТАЦИИ ---
 @app.get("/openapi.json", include_in_schema=False)
 async def get_openapi(admin: str = Depends(verify_admin_token)):
-    if admin != ADMIN_USERNAME:
-        raise HTTPException(status_code=404, detail="Not Found")
     return app.openapi()
 
 
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html(admin: str = Depends(verify_admin_token)):
-    if admin != ADMIN_USERNAME:
-        raise HTTPException(status_code=404, detail="Not Found")
     return get_swagger_ui_html(openapi_url="/openapi.json", title="API Docs")
 
 
