@@ -24,17 +24,30 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 MANAGER_USERNAME = os.getenv("MANAGER_USERNAME")
 MANAGER_PASSWORD = os.getenv("MANAGER_PASSWORD")
 
-# Проверяем, что заданы ВСЕ переменные
+MANAGER_USERNAME1 = os.getenv("MANAGER_USERNAME1")
+MANAGER_PASSWORD1 = os.getenv("MANAGER_PASSWORD1")
+
+MANAGER_USERNAME2 = os.getenv("MANAGER_USERNAME2")
+MANAGER_PASSWORD2 = os.getenv("MANAGER_PASSWORD2")
+
+MANAGER_USERNAME3 = os.getenv("MANAGER_USERNAME3")
+MANAGER_PASSWORD3 = os.getenv("MANAGER_PASSWORD3")
+
 if not all(
     [SECRET_KEY, ADMIN_USERNAME, ADMIN_PASSWORD, MANAGER_USERNAME, MANAGER_PASSWORD]
 ):
-    logger.critical(
-        "КРИТИЧЕСКАЯ ОШИБКА: Не заданы переменные окружения SECRET_KEY, ADMIN_USERNAME, ADMIN_PASSWORD, MANAGER_USERNAME или MANAGER_PASSWORD!"
-    )
-    logger.critical(
-        "Создайте файл .env (или добавьте переменные на сервере Render) и перезапустите."
-    )
+    logger.critical("КРИТИЧЕСКАЯ ОШИБКА: Не заданы основные переменные окружения!")
     raise SystemExit(1)
+
+# Словарь админов
+USERS = {
+    ADMIN_USERNAME: ADMIN_PASSWORD,
+    MANAGER_USERNAME: MANAGER_PASSWORD,
+    MANAGER_USERNAME1: MANAGER_PASSWORD1,
+    MANAGER_USERNAME2: MANAGER_PASSWORD2,
+    MANAGER_USERNAME3: MANAGER_PASSWORD3,
+}
+USERS = {k: v for k, v in USERS.items() if k and v}
 
 ALGORITHM = "HS256"
 templates = Jinja2Templates(directory="templates")
@@ -52,7 +65,7 @@ def create_access_token(username: str):
 
 def verify_admin_token(access_token: str | None = Cookie(default=None)):
     """
-    Проверка JWT-токена (пускает и админа, и менеджера)
+    Проверка JWT-токена (пускает всех, кто есть в словаре USERS)
     """
     if not access_token:
         raise HTTPException(status_code=401, detail="Вы не авторизованы")
@@ -60,7 +73,7 @@ def verify_admin_token(access_token: str | None = Cookie(default=None)):
         payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
 
-        if username not in [ADMIN_USERNAME, MANAGER_USERNAME]:
+        if username not in USERS:
             raise HTTPException(status_code=401, detail="Неверный пользователь")
         return username
     except jwt.ExpiredSignatureError:
@@ -76,42 +89,49 @@ async def lifespan(app: FastAPI):
     """
     await database.startup()
     yield  # сервер начал принятие запросов
-
-    # отключение
     await database.shutdown()
 
 
-# 2. Передача lifespan в FastAPI
+# app ОДИН РАЗ (перед декораторами)
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None)
 
 
 @app.exception_handler(FastAPIHTTPException)
 async def custom_http_exception_handler(request: Request, exc: FastAPIHTTPException):
-    # Если ошибка 401 (нет доступа) И это запрос от браузера (ожидает HTML)
+    # Редирект на логин при 401 ошибке в браузере
     if exc.status_code == 401 and "text/html" in request.headers.get("accept", ""):
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
-
-    # Для всех остальных случаев (ошибки API, 404 и т.д.) возвращаем стандартный JSON
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
     )
 
 
+# --- ЗАЩИТА ДОКУМЕНТАЦИИ ---
+@app.get("/openapi.json", include_in_schema=False)
+async def get_openapi(admin: str = Depends(verify_admin_token)):
+    if admin != ADMIN_USERNAME:
+        raise HTTPException(status_code=404, detail="Not Found")
+    return app.openapi()
+
+
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html(admin: str = Depends(verify_admin_token)):
+    if admin != ADMIN_USERNAME:
+        raise HTTPException(status_code=404, detail="Not Found")
     return get_swagger_ui_html(openapi_url="/openapi.json", title="API Docs")
 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # <------------------------============
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
+# --- API ЭНДПОИНТЫ ---
 @app.get("/api/pets")
 async def get_all_pets():
     async with database.pool.acquire() as conn:
@@ -121,9 +141,6 @@ async def get_all_pets():
 
 @app.post("/api/pets")
 async def create_fur(fur: FurCreate):
-    """
-    Добавление нового блока с новым питомцем
-    """
     async with database.pool.acquire() as conn:
         inf = """INSERT INTO lost_pets (name, species, street)
         VALUES ($1, $2, $3)
@@ -134,23 +151,16 @@ async def create_fur(fur: FurCreate):
 
 @app.delete("/api/pets/{fur_id}")
 async def dell_fur(fur_id: int, admin: str = Depends(verify_admin_token)):
-    """
-    Удаление блока с информации о выбранном питомце
-    """
     async with database.pool.acquire() as conn:
         inf = "DELETE FROM lost_pets WHERE id = $1;"
         status_fur = await conn.execute(inf, fur_id)
     if status_fur == "DELETE 0":
         raise HTTPException(status_code=404, detail="Питомец с таким ID не найден")
-
     return {"message": f"Животное с id={fur_id} удалено"}
 
 
 @app.patch("/api/pets/{fur_id}/found")
 async def mark_as_found(fur_id: int, admin: str = Depends(verify_admin_token)):
-    """
-    обновление статуса питомца
-    """
     async with database.pool.acquire() as conn:
         inf = """UPDATE lost_pets
             set status = 'found'
@@ -171,25 +181,25 @@ async def mark_as_found(fur_id: int, admin: str = Depends(verify_admin_token)):
 # --- ЭНДПОИНТЫ АВТОРИЗАЦИИ ---
 @app.get("/login")
 async def login_page(request: Request):
-    """
-    Страница входа в админку
-    """
     return templates.TemplateResponse(request=request, name="login.html", context={})
 
 
 @app.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
-    """
-    Обработка формы входа и выдача токена (для админа и менеджера)
-    """
-    # Проверка прав
-    is_admin = username == ADMIN_USERNAME and password == ADMIN_PASSWORD
-    is_manager = username == MANAGER_USERNAME and password == MANAGER_PASSWORD
 
-    if is_admin or is_manager:
+    if USERS.get(username) == password:
         token = create_access_token(username)
         response = RedirectResponse(url="/admin", status_code=303)
-        response.set_cookie(key="access_token", value=token, httponly=True)
+
+        # БЕЗОПАСНАЯ КУКА
+        response.set_cookie(
+            key="access_token",
+            value=token,
+            httponly=True,
+            secure=True,  # Работает только по HTTPS (Render)
+            samesite="lax",
+            max_age=2 * 60 * 60,
+        )
         return response
     else:
         return templates.TemplateResponse(
@@ -199,16 +209,31 @@ async def login(request: Request, username: str = Form(...), password: str = For
         )
 
 
+@app.get("/admin/system-check", include_in_schema=False)
+async def system_check_page(request: Request, admin: str = Depends(verify_admin_token)):
+    if admin != ADMIN_USERNAME:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    async with database.pool.acquire() as conn:
+        logs = await conn.fetch(
+            "SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 50;"
+        )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="history.html",
+        context={"logs": [dict(row) for row in logs]},
+    )
+
+
 @app.get("/logout")
 async def logout():
-    """
-    Выход из админки и удаление токена
-    """
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie("access_token")
     return response
 
 
+# --- АДМИНКА ---
 @app.get("/admin")
 async def admin_panel(request: Request, admin: str = Depends(verify_admin_token)):
     async with database.pool.acquire() as conn:
@@ -223,7 +248,12 @@ async def admin_panel(request: Request, admin: str = Depends(verify_admin_token)
 async def admin_delete_pet(fur_id: int, admin: str = Depends(verify_admin_token)):
     async with database.pool.acquire() as conn:
         await conn.execute("DELETE FROM lost_pets WHERE id = $1;", fur_id)
-
+        await conn.execute(
+            "INSERT INTO audit_logs (username, action, pet_id) VALUES ($1, $2, $3);",
+            admin,
+            "Удалён питомец",
+            fur_id,
+        )
     return RedirectResponse(url="/admin", status_code=303)
 
 
@@ -233,5 +263,10 @@ async def admin_found_pet(fur_id: int, admin: str = Depends(verify_admin_token))
         await conn.execute(
             "UPDATE lost_pets SET status = 'found' WHERE id = $1;", fur_id
         )
-
+        await conn.execute(
+            "INSERT INTO audit_logs (username, action, pet_id) VALUES ($1, $2, $3);",
+            admin,
+            "Отметил найденным",
+            fur_id,
+        )
     return RedirectResponse(url="/admin", status_code=303)

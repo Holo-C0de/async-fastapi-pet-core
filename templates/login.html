@@ -4,13 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Вход в систему | Питомец рядом</title>
-    <!-- Bootstrap CSS -->
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Иконки Bootstrap -->
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     
     <style>
-        /* 1. Анимированный градиентный фон */
         body {
             margin: 0;
             padding: 0;
@@ -30,7 +29,7 @@
             100% { background-position: 0% 50%; }
         }
 
-        /* 2. Стеклянная карточка (Glassmorphism) + 3D-наклон */
+
         .glass-card {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(15px);
@@ -44,18 +43,18 @@
             color: white;
             position: relative;
             
-            /* Плавный переход для 3D-эффекта */
+
             transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s ease;
             transform-style: preserve-3d;
         }
 
-        /* 3D-наклон при наведении */
+
         .glass-card:hover {
             transform: perspective(1000px) rotateX(2deg) rotateY(-2deg) scale(1.02);
             box-shadow: -10px 15px 35px rgba(0, 0, 0, 0.3);
         }
 
-        /* 3. Тряска при ошибке (Shake) */
+
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
             10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
@@ -66,13 +65,13 @@
             animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both !important;
         }
 
-        /* 4. Волшебное появление (Staggered Fade-in) */
+
         @keyframes slideUp {
             from { opacity: 0; transform: translateY(30px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Обертка для лисы, чтобы анимации не конфликтовали */
+  
         .fox-wrapper {
             opacity: 0;
             animation: slideUp 0.6s 0.1s forwards;
@@ -114,7 +113,7 @@
             animation: slideUp 0.6s 0.25s forwards;
         }
 
-        /* Поля ввода и задержки их появления */
+
         .form-group-login { opacity: 0; animation: slideUp 0.6s 0.3s forwards; }
         .form-group-password { opacity: 0; animation: slideUp 0.6s 0.4s forwards; }
         .btn-container { opacity: 0; animation: slideUp 0.6s 0.5s forwards; }
@@ -128,7 +127,7 @@
             transition: all 0.3s ease;
         }
 
-        /* 5. Пульсирующее свечение при фокусе (Pulse Glow) */
+
         @keyframes pulseGlow {
             0% { box-shadow: 0 0 0 0 rgba(255, 154, 0, 0.4); }
             70% { box-shadow: 0 0 0 10px rgba(255, 154, 0, 0); }
@@ -158,7 +157,7 @@
 
         .form-label { font-weight: 500; font-size: 0.9rem; }
 
-        /* 3D Кнопка */
+
         .btn-login {
             background: linear-gradient(135deg, #ff9a00 0%, #ff5e00 100%);
             border: none;
@@ -189,7 +188,7 @@
 </head>
 <body>
 
-    <!-- Добавляем класс shake-error, если есть ошибка (Jinja2) -->
+
     <div class="glass-card {% if error %}shake-error{% endif %}">
         
         <div class="fox-wrapper">
@@ -198,7 +197,7 @@
 
         <h2><i class="bi bi-shield-lock-fill"></i> Админ-панель</h2>
         
-        <!-- Блок для вывода ошибки -->
+
         {% if error %}
         <div class="alert error-alert text-center py-2 mb-4" role="alert">
             <i class="bi bi-exclamation-triangle-fill"></i> {{ error }}

@@ -28,6 +28,14 @@ async def startup():
     photo_url VARCHAR(255),
     status VARCHAR(20) DEFAULT 'active'
     );""")
+        await conn.execute("""
+    CREATE TABLE IF NOT EXISTS audit_logs (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    action VARCHAR(255) NOT NULL,
+    pet_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );""")
 
 
 async def shutdown():

@@ -8,13 +8,14 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
-
-    
     <nav class="navbar navbar-dark bg-dark px-4">
         <span class="navbar-brand mb-0 h1">🐾 Питомец рядом (Админка)</span>
-        <a href="/docs" class="btn btn-outline-light btn-sm" target="_blank">Перейти в Swagger API</a>
+        <div class="d-flex gap-2">
+            <a href="/docs" class="btn btn-outline-light btn-sm" target="_blank">Перейти в Swagger API</a>
+            <a href="/logout" class="btn btn-danger btn-sm">Выйти</a>
+        </div>
     </nav>
-
+    
     <div class="container mt-5">
         <div class="card shadow-sm">
             <div class="card-header bg-white">
@@ -38,13 +39,11 @@
                             <td>{{ pet.id }}</td>
                             <td class="fw-bold">{{ pet.name }}</td>
                             <td>
-                                
                                 {% if pet.species == 'dog' %}
                                     <span class="badge bg-primary">Собака</span>
                                 {% elif pet.species == 'cat' %}
                                     <span class="badge bg-warning text-dark">Кошка</span>
                                 {% else %}
-
                                     <span class="badge bg-secondary">{{ pet.species }}</span>
                                 {% endif %}
                             </td>
@@ -73,13 +72,11 @@
             </div>
         </div>
         
-        
         {% if not pets %}
         <div class="alert alert-info mt-4 text-center">
-               Данных нет <a href="/docs" class="alert-link">Swagger API</a>.
+               Данных нет. Добавте питомцев через <a href="/docs" class="alert-link">Swagger API</a>.
         </div>
         {% endif %}
     </div>
-
 </body>
 </html>
