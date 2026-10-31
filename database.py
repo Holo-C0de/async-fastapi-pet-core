@@ -49,6 +49,6 @@ async def shutdown():
 
 
 class FurCreate(BaseModel):
-    name: str
+    name: str | None = None
     species: str
     street: str
