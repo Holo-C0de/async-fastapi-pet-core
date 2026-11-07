@@ -135,6 +135,24 @@ async def get_all_pets():
     return [dict(row) for row in to_get]
 
 
+# --- НОВЫЙ ЭНДПОИНТ ДЛЯ ПОЛУЧЕНИЯ ОДНОГО ЖИВОТНОГО ---
+@app.get("/api/pets/{fur_id}")
+async def get_one_pet(fur_id: int):
+    """
+    Получение одного питомца по ID
+    """
+    async with database.pool.acquire() as conn:
+        pet = await conn.fetchrow("SELECT * FROM lost_pets WHERE id = $1;", fur_id)
+
+    if pet is None:
+        raise HTTPException(status_code=404, detail="Питомец не найден")
+
+    return dict(pet)
+
+
+# -----------------------------------------------------
+
+
 @app.post("/api/pets")
 async def create_fur(fur: FurCreate):
     async with database.pool.acquire() as conn:
