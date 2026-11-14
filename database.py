@@ -18,7 +18,6 @@ async def startup():
     global pool
     pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5)
     async with pool.acquire() as conn:
-        # Обновленная таблица lost_pets
         await conn.execute("""
     CREATE TABLE IF NOT EXISTS lost_pets (
     id SERIAL PRIMARY KEY,
@@ -31,16 +30,6 @@ async def startup():
     contact_email VARCHAR(100) NOT NULL,
     status VARCHAR(20) DEFAULT 'active'
     );""")
-        
-        # Таблица логов (остается без изменений)
-        await conn.execute("""
-    CREATE TABLE IF NOT EXISTS audit_logs (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(100) NOT NULL,
-    action VARCHAR(255) NOT NULL,
-    pet_id INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );""")
 
 
 async def shutdown():
@@ -50,7 +39,6 @@ async def shutdown():
         logger.error("ОШИБКА: Пул соединений не был инициализирован при выключении.")
 
 
-# Валидация длины полей и типа объявления
 class FurCreate(BaseModel):
     name: str | None = Field(default=None, max_length=100)
     species: str = Field(min_length=2, max_length=50)

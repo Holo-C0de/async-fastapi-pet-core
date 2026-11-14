@@ -36,7 +36,7 @@ for key in os.environ:
             USERS[username] = password
 
 if not SECRET_KEY or not USERS:
-    logger.critical("КРИТИЧЕСКАЯ ОШИБКА: Не заданы SECRET_KEY или список пользователей (ADMIN/MANAGER)!")
+    logger.critical("КРИТИЧЕСКАЯ ОШИБКА: Не заданы SECRET_KEY или список пользователей!")
     raise SystemExit(1)
 
 ALGORITHM = "HS256"
@@ -103,8 +103,6 @@ app.add_middleware(
 
 
 # --- API ЭНДПОИНТЫ ---
-
-# Фильтрация по species и report_type
 @app.get("/api/pets")
 async def get_all_pets(species: str | None = None, report_type: str | None = None):
     query = "SELECT * FROM lost_pets WHERE 1=1"
@@ -195,23 +193,6 @@ async def login(request: Request, username: str = Form(...), password: str = For
         )
 
 
-@app.get("/admin/system-check", include_in_schema=False)
-async def system_check_page(request: Request, admin: str = Depends(verify_admin_token)):
-    if admin != ADMIN_USERNAME:
-        raise HTTPException(status_code=404, detail="Not Found")
-
-    async with database.pool.acquire() as conn:
-        logs = await conn.fetch(
-            "SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 50;"
-        )
-
-    return templates.TemplateResponse(
-        request=request,
-        name="history.html",
-        context={"logs": [dict(row) for row in logs]},
-    )
-
-
 @app.get("/logout")
 async def logout():
     response = RedirectResponse(url="/login", status_code=303)
@@ -233,10 +214,6 @@ async def admin_panel(request: Request, admin: str = Depends(verify_admin_token)
 async def admin_delete_pet(fur_id: int, admin: str = Depends(verify_admin_token)):
     async with database.pool.acquire() as conn:
         await conn.execute("DELETE FROM lost_pets WHERE id = $1;", fur_id)
-        await conn.execute(
-            "INSERT INTO audit_logs (username, action, pet_id) VALUES ($1, $2, $3);",
-            admin, "Удалён питомец", fur_id,
-        )
     return RedirectResponse(url="/admin", status_code=303)
 
 
@@ -244,8 +221,4 @@ async def admin_delete_pet(fur_id: int, admin: str = Depends(verify_admin_token)
 async def admin_found_pet(fur_id: int, admin: str = Depends(verify_admin_token)):
     async with database.pool.acquire() as conn:
         await conn.execute("UPDATE lost_pets SET status = 'found' WHERE id = $1;", fur_id)
-        await conn.execute(
-            "INSERT INTO audit_logs (username, action, pet_id) VALUES ($1, $2, $3);",
-            admin, "Отметил найденным", fur_id,
-        )
     return RedirectResponse(url="/admin", status_code=303)
